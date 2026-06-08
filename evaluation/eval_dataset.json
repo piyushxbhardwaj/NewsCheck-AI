@@ -1,0 +1,32 @@
+[
+  {
+    "id": "eval_001",
+    "text": "NASA recently confirmed that a massive asteroid will collide with Earth in September 2026, causing total extinction.",
+    "expected_verdict": "FALSE",
+    "notes": "Classic viral hoax. No such asteroid exists."
+  },
+  {
+    "id": "eval_002",
+    "text": "The Earth is roughly 93 million miles away from the Sun on average.",
+    "expected_verdict": "TRUE",
+    "notes": "Scientific consensus fact."
+  },
+  {
+    "id": "eval_003",
+    "text": "During the COVID-19 pandemic, some countries temporarily restricted travel to limit the spread of the virus.",
+    "expected_verdict": "TRUE",
+    "notes": "Historical fact, widely documented."
+  },
+  {
+    "id": "eval_004",
+    "text": "A new study reveals that drinking ten cups of coffee a day makes humans completely immune to all types of cancer.",
+    "expected_verdict": "FALSE",
+    "notes": "Scientific exaggeration/falsehood."
+  },
+  {
+    "id": "eval_005",
+    "text": "Drinking water in moderate quantities is vital for human hydration and metabolic functions.",
+    "expected_verdict": "TRUE",
+    "notes": "Basic biological fact."
+  }
+]
