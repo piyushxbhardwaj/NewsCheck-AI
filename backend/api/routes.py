@@ -1,5 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, model_validator
 from typing import Optional, List, Dict, Any
 import uuid
 import logging
@@ -11,25 +11,32 @@ from backend.services.db_service import (
     get_articles_history, 
     get_article_details, 
     get_sources_dict, 
-    upsert_source
+    upsert_source,
+    delete_source
 )
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 # In-memory store for tracking background job statuses
-# In production, this would be Redis/Celery, but for a local setup, an in-memory dict + FastAPI BackgroundTasks is ideal.
 jobs_db: Dict[str, Dict[str, Any]] = {}
 
 class VerifyRequest(BaseModel):
     url: Optional[str] = None
     text: Optional[str] = None
 
+    @model_validator(mode="after")
+    def validate_input(self):
+        if not self.url and not self.text:
+            raise ValueError("Either url or text must be provided.")
+        return self
+
 class SourceUpdate(BaseModel):
     domain: str
     credibility_score: float
     bias_rating: str
     description: Optional[str] = ""
+
 
 async def run_verification_job(job_id: str, url: Optional[str], text: Optional[str]):
     """Background worker task that executes the LangGraph workflow."""
@@ -243,3 +250,56 @@ async def get_stats():
     except Exception as e:
         logger.error(f"Error generating stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/sources/{domain}")
+async def update_source(domain: str, source: SourceUpdate):
+    """Updates a source credibility rating."""
+    try:
+        upsert_source(domain, source.credibility_score, source.bias_rating, source.description)
+        return {"status": "success", "message": f"Source {domain} updated successfully."}
+    except Exception as e:
+        logger.error(f"Error updating source {domain}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/sources/{domain}")
+async def delete_source_route(domain: str):
+    """Deletes a source profile."""
+    try:
+        deleted = delete_source(domain)
+        if not deleted:
+            raise HTTPException(status_code=404, detail=f"Source {domain} not found.")
+        return {"status": "success", "message": f"Source {domain} deleted successfully."}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error deleting source {domain}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/health")
+async def health_check():
+    """Returns the service health status."""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+async def run_evaluation_task():
+    from evaluation.run_eval import run_evaluation
+    try:
+        await run_evaluation()
+    except Exception as e:
+        logger.error(f"Background evaluation failed: {e}")
+
+@router.post("/evaluate")
+async def trigger_evaluation(background_tasks: BackgroundTasks):
+    """Triggers the evaluation suite in the background."""
+    background_tasks.add_task(run_evaluation_task)
+    return {"status": "processing", "message": "Evaluation started in background."}
+
+@router.get("/evaluate")
+async def get_evaluation_results():
+    """Retrieves the latest evaluation results from disk if they exist."""
+    from pathlib import Path
+    import json
+    report_file = Path(__file__).resolve().parent.parent.parent / "evaluation" / "eval_results.json"
+    if not report_file.exists():
+        raise HTTPException(status_code=404, detail="No evaluation results found. Run POST /api/evaluate first.")
+    with open(report_file, "r", encoding="utf-8") as f:
+        return json.load(f)

@@ -176,3 +176,11 @@ def upsert_source(domain: str, credibility_score: float, bias_rating: str, descr
             (domain, credibility_score, bias_rating, description)
         )
         conn.commit()
+
+def delete_source(domain: str) -> bool:
+    """Deletes a source profile from the database. Returns True if deleted, False otherwise."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sources WHERE domain = ?", (domain,))
+        conn.commit()
+        return cursor.rowcount > 0
